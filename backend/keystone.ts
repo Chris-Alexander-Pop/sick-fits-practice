@@ -8,6 +8,10 @@ import { ProductImage } from './schemas/ProductImage';
 import { Product } from './schemas/Product';
 import { User } from './schemas/User';
 import 'dotenv/config';
+import { insertSeedData } from './seed-data';
+import { sendPasswordResetEmail } from './lib/mail';
+
+function check(name: string) {}
 
 const databaseURL =
   process.env.DATABASE_URL || 'mongodb://localhost/keystone-sick-fits-tutorial';
@@ -25,11 +29,16 @@ const { withAuth } = createAuth({
     fields: ['name', 'email', 'password'],
     // TODO: Add in inital roles here
   },
+  passwordResetLink: {
+    async sendToken(args) {
+      // send the email
+      await sendPasswordResetEmail(args.token, args.identity);
+    },
+  },
 });
 
 export default withAuth(
   config({
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     server: {
       cors: {
@@ -40,7 +49,12 @@ export default withAuth(
     db: {
       adapter: 'mongoose',
       url: databaseURL,
-      // TODO: Add data seeding here
+      async onConnect(keystone) {
+        console.log('Connected to the database!');
+        if (process.argv.includes('--seed-data')) {
+          await insertSeedData(keystone);
+        }
+      },
     },
     lists: createSchema({
       // Schema items go in here
@@ -52,7 +66,6 @@ export default withAuth(
       // Show the UI only for poeple who pass this test
       isAccessAllowed: ({ session }) =>
         // console.log(session);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         !!session?.data,
     },
     session: withItemData(statelessSessions(sessionConfig), {
